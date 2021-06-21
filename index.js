@@ -38,53 +38,50 @@ const typeDefs = gql`
     toPlaceName: String!
     },
 `;
-
-
+  
   async function GetAllTrip(limit, offset){
     return await tripModel.find({}).skip(offset).limit(limit)
   }
 
-  async function getGeocoding(){
- 
-    // Geocode an address to coordinates
-  
-    // Reverse geocode coordinates to address.
-    // geocoding.reverseGeocode('mapbox.places', '4.8936580', '52.3731720', function (err, geoData) {
-    //     console.log(geoData);
-    // });
+  async function reverseCode(code){
+    geocoding.reverseGeocode('mapbox.places', `${code}`, `${code}`, function (err, geoData) {
+      console.log(geoData);
+    });
+    geocoding.reverseGeocode('mapbox.places', '4.8936580', '52.3731720', function (err, geoData) {
+      console.log(geoData);
+  });
+    return code
   }
-  getGeocoding()
 
   async function setData(fromPlace, toPlace){
-    //Map Box Here!
-    const data = await new tripModel({
-      fromPlace: {},
-      toPlace:{}
+    let data = await new tripModel({
+      fromPlace:{id:""},
+      toPlace:{id:""}
     })
-    console.log(data)
-    const formPlaceGeocoding = await geocoding.geocode('mapbox.places', `${fromPlace}`, function (err, geoData) {
+    geocoding.geocode('mapbox.places', `${fromPlace}`, function (err, geoData) {
       if(err){
         console.log(err)
       }else{
-        // data.fromPlace = {id:geoData.features[3].id}
-        // console.log(geoData.features[3]);
+        console.log(geoData.features[3].geometry.coordinates)
+        data.fromPlace = {id:geoData.features[3].id}
       }
     });
-    const toPlaceGeocoding = await geocoding.geocode('mapbox.places', `${toPlace}`, function (err, geoData) {
+    geocoding.geocode('mapbox.places', `${toPlace}`, function (err, geoData) {
       if(err){
         console.log(err)
       }else{
-        // data.toPlace = {id:geoData.features[3].id}
-        // console.log(geoData.features[3]);
-      }
-    });
-    // data.save()
+        data.toPlace = {id:geoData.features[3].id}
+      }})
+    // setTimeout(function(){
+      console.log(data)
+      // data.save()
+    // },300)
     return data
   }
 
 
   var Trip  = [{
-    id: Test,
+    id:123,
     fromPlace:{
       name: "Kyiv"
     },
@@ -96,33 +93,59 @@ const typeDefs = gql`
 
   const resolvers = {
     Mutation: {
-      createTrip: (parent, args) => {
-        setData(args.input.fromPlaceName, args.input.toPlaceName)
-        console.log(create_id)
+      createTrip: async(parent, args) => {
+        const data_set = await setData(args.input.fromPlaceName, args.input.toPlaceName)
+        console.log(data_set.id)
+        console.log(data_set.fromPlace.id)
+        setTimeout(function(){
+          data.fromPlace.id = data_set.fromPlace.id
+          data.toPlace.id = data_set.toPlace.id
+          console.log(">>>>>>>>>>>>>>>>>")
+          console.log(">>>>>>>>>>>>>>>>>")
+          console.log(data_set.fromPlace.id)
+
+          console.log(data)
+        },300)
         const data = {
-          id: '12312312',
+          id: `urn::trip:${data_set.id}`,
           fromPlace:{
-            id:'123123',
+            id: data_set.toPlace.id,
             name: args.input.fromPlaceName
           },
           toPlace:{
-            id: "123123",
+            id: data_set.fromPlace.id,
             name: args.input.toPlaceName
           }
         }
-        return data
+        return await data
       }
     },
     Query: {
-      trips: (parent, args) => Trip
+      trips: async (parent, args) => {
+        const all_trip = await GetAllTrip(args.limit, args.offset)
+        const data = []
+        for(let i = 0; i < all_trip.length; i++){
+          const nameFromPlace = reverseCode(all_trip[i].fromPlace.id)
+          const nameToPlace = reverseCode(all_trip[i].toPlace.id)
+
+          console.log(nameFromPlace)
+          console.log(nameToPlace)
+          data.push(
+            {id:  `urn::trip:${all_trip[i].id}`,
+            fromPlace:{
+              name: nameFromPlace
+            },
+            toPlace:{
+              name: nameToPlace
+            }
+          })
+        }
+        console.log(all_trip)
+        return data
+      }
        
         // ALL Trips
-        
-        // GetAllTrip(args.limit, args.offset).then(data => {
-        //   console.log()
-        //   console.log(result)
-        // return result
-        // }
+
     }
   };
 
